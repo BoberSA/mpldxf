@@ -110,28 +110,27 @@ class RendererDxf(RendererBase):
                 # we have a face color so we draw a filled polygon,
                 # in DXF this means a HATCH entity
                 hatch = self.modelspace.add_hatch(dxfcolor)
-                with hatch.edit_boundary() as editor:
-                    editor.add_polyline_path(vertices)
+                hatch.paths.add_polyline_path(vertices)
+                # with hatch.edit_boundary() as editor:
+                #     editor.add_polyline_path(vertices)
             else:
                 # A non-filled polygon or a line - use LWPOLYLINE entity
                 attrs = {
                     'color': dxfcolor,
                 }
-                self.modelspace.add_lwpolyline(vertices, attrs)
+                self.modelspace.add_lwpolyline(vertices, dxfattribs=attrs)
 
 
     def draw_image(self, gc, x, y, im):
         pass
 
     def draw_text(self, gc, x, y, s, prop, angle, ismath=False, mtext=None):
+        from ezdxf.enums import TextEntityAlignment
         fontsize = self.points_to_pixels(prop.get_size_in_points())
         dxfcolor = rgb_to_dxf(gc.get_rgb())
 
-        text = self.modelspace.add_text(s.encode('ascii', 'ignore'), {
-            'height': fontsize,
-            'rotation': angle,
-            'color': dxfcolor,
-        })
+        text = self.modelspace.add_text(s.encode('ascii', 'ignore'),
+            height = fontsize, rotation = angle, dxfattribs={'color': dxfcolor})
 
         halign = self._map_align(mtext.get_ha(), vert=False)
         valign = self._map_align(mtext.get_va(), vert=True)
@@ -143,7 +142,9 @@ class RendererDxf(RendererBase):
         p1 = x, y
         p2 = (x - 50, y)
 
-        text.set_pos(p1, p2=p2, align=align)
+        entity_align = getattr(TextEntityAlignment, align)
+
+        text.set_placement(p1, p2=p2, align=entity_align)
 
     def _map_align(self, align, vert=False):
         """Translate a matplotlib text alignment to the ezdxf alignment."""
@@ -152,6 +153,8 @@ class RendererDxf(RendererBase):
             align = align.upper()
         elif align == 'baseline':
             align = ''
+        elif align == 'center_baseline':
+            align = 'CENTER' if vert else ''
         else:
             raise NotImplementedError
         if vert and align == 'CENTER':
